@@ -1,15 +1,3 @@
-# Florida
-
-Follow [FRIDA](https://github.com/frida/frida) upstream, automatically patch and build an anti-detection version of frida-server for Android.
-
-跟随 FRIDA 上游自动修补并构建反检测版本的 frida-server。
-
-**Hint: Don't fork this repository**
-
-## Download
-
-[Latest Release](https://github.com/ret2ldz/Florida/releases/latest)
-
 ## What's patched
 
 `build.yml` clones frida main + submodules, applies every `patches/<subproject>/*.patch` in alphabetical order via `git am`, then builds for `android-arm`, `android-arm64`, `android-x86`, `android-x86_64`.
@@ -33,6 +21,7 @@ Follow [FRIDA](https://github.com/frida/frida) upstream, automatically patch and
 | 0013 | `exit-monitor-disable` | `interceptor.attach(exit/_exit/abort)` hook | Comments out the exit-monitor hooks in `lib/payload/exit-monitor.vala`. Removes the trampoline gum installs near libc `exit`, which apps detect by calling `exit()` and observing whether a listener fired. (Merged from phantom-frida.) |
 | 0014 | `temp-prefix` | `"frida-"` temp-file prefix | Renames the prefix that `Frida.System.make_name()` prepends to random temp file names in `src/system.vala` to `"ggbond-"`. `/data/local/tmp/frida-*` listings no longer match. (Merged from phantom-frida.) |
 | 0015 | `pool-spawner-and-string-sweep` | `pool-spawner` thread name + residual `frida\0`/`FRIDA\0` bytes | Extends `anti-anti-frida.py` with: (1) `pool-spawner` thread name patch (12-char random) — the one GLib thread name Florida was missing; (2) `.rodata` sweep for standalone null-terminated `frida\0` → `libgc\0` and `FRIDA\0` → `XBNDL\0`, same-length so binary layout is unchanged. Deliberately skips `Frida\0` (capital F) — that's the JS engine global object (`Frida.version`, etc.) and replacing it crashes `core.js` with `ReferenceError: Frida is not defined`. (Merged from phantom-frida.) |
+| 0016 | `helper-jni-rename` | `re.frida.Helper` / `re/frida/HelperBackend` Java class + JNI class refs | Renames the Android helper's Java package (`re.frida` → `re.ggbond`), the embedded-DEX class refs in dot-notation (`re.frida.Helper`, `re.frida.helper` nice-name, `re.frida.Gadget` app id), the JNI `find_class` slash-notation ref (`re/frida/HelperBackend`), and the helper D-Bus interface + object path. PR phantom-frida#7 only adds the slash-notation rename as a bug fix for their own broken source-level rename; for Florida this is the first time these strings are touched, so the patch also includes the prerequisite dot-notation / package-declaration renames (otherwise the JNI `find_class("re/ggbond/HelperBackend")` would look for a class that doesn't exist and trip `assert(backend_class != null)`). Deliberately leaves `re.frida.HostSession17` / `re.frida.AgentSession17` / etc. untouched — those are the client-server wire protocol and renaming breaks the unpatched `pip install frida-tools` client. (Merged from phantom-frida PR #7 + prerequisite source renames.) |
 
 ### frida-gum patches
 
@@ -52,42 +41,13 @@ Follow [FRIDA](https://github.com/frida/frida) upstream, automatically patch and
 - **TLS feature values** used by gum interceptor state.
 - **QuickJS string constants** in `libfrida-gumjs` (e.g. `<anonymous>`, `JS_Eval`).
 
-## Build workflow
-
-The CI (`.github/workflows/build.yml`) runs every 12 hours on cron, on push to `main`/`ci` when `patches/**` or the workflow itself changes, and on manual dispatch. It:
-
-1. Checks Frida's latest release tag.
-2. Creates (or recreates, on push) a release with that tag.
-3. Clones frida main, applies all patches in `patches/<subproject>/` via `git am --keep-cr`.
-4. Builds for `android-arm`, `android-arm64`, `android-x86`, `android-x86_64`.
-5. Packages and uploads 16 gzipped artifacts per release:
-   - `florida-server-<ver>-android-<arch>.gz`
-   - `florida-inject-<ver>-android-<arch>.gz`
-   - `florida-gadget-<ver>-android-<arch>.so.gz`
-   - `florida-gumjs-<ver>-android-<arch>.a.gz`
-
 ## Recent changes
 
 - **CI fixes:** Added `permissions: contents: write` (was failing with "Resource not accessible by integration" on `create_release`). Bumped `actions/github-script@v3 → v7`, `softprops/action-gh-release@v2.1.0 → v2.2.0` (Node.js 20 deprecation). Bumped checkout/setup-node/setup-java/setup-python to v4/v4/v4/v5. Replaced the 16 deprecated `actions/upload-release-asset@v1.0.2` (Node.js 12, removed mid-2023) with one `gh release upload --clobber` step. Fixed a typo: `florida-inject-...-android-arm-x86_64.gz` → `...-android-x86_64.gz`.
-- **Patches 0011–0015 (frida-core) + 0002/0003 (frida-gum):** Merged anti-detection vectors from [phantom-frida](https://github.com/TheQmaks/phantom-frida). See the patch tables above.
+- **Patches 0011–0016 (frida-core) + 0002/0003 (frida-gum):** Merged anti-detection vectors from [phantom-frida](https://github.com/TheQmaks/phantom-frida). See the patch tables above. Patch 0016 specifically corresponds to [phantom-frida PR #7](https://github.com/TheQmaks/phantom-frida/pull/7) (helper JNI class-name rename) plus the prerequisite dot-notation / package-declaration renames that make the slash-notation rename actually work.
 - **Patch 0011:** Forward-port of [frida-core PR #1246](https://github.com/frida/frida-core/pull/1246) for Android-16 USAP spawn reliability.
 
 ## References
 
-- [https://github.com/hluwa/Patchs](https://github.com/hluwa/Patchs)
-- [https://github.com/feicong/strong-frida](https://github.com/feicong/strong-frida)
-- [https://github.com/qtfreet00/AntiFrida](https://github.com/qtfreet00/AntiFrida)
-- [https://t.zsxq.com/miIunQN](https://t.zsxq.com/miIunQN)
-- [https://github.com/darvincisec/DetectFrida](https://github.com/darvincisec/DetectFrida)
-- [https://github.com/b-mueller/frida-detection-demo](https://github.com/b-mueller/frida-detection-demo)
+- https://github.com/Ylarod/Florida
 - [https://github.com/TheQmaks/phantom-frida](https://github.com/TheQmaks/phantom-frida)
-
-## Thanks
-
-- [@hluwa](https://github.com/hluwa)
-- [@feicong](https://github.com/feicong)
-- [@r0ysue](https://github.com/r0ysue)
-- [@hellodword](https://github.com/hellodword)
-- [@qtfreet00](https://github.com/qtfreet00)
-- [@TheQmaks](https://github.com/TheQmaks) — phantom-frida, source of merged vectors 0012–0015 / 0002 / 0003
-- [@dezige131](https://github.com/dezige131) — frida-core PR #1246, source of patch 0011
