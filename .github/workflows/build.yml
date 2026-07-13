@@ -152,10 +152,10 @@ jobs:
           name=$(basename $path)
           real=$(realpath $path)
           echo "Apply patches in $real to frida/subprojects/$name"
+          echo "  patches: $(ls -1 ../patches/$name/*.patch | xargs -n1 basename | tr '\n' ' ')"
           cd subprojects/$name
-          git am ../../../patches/$name/*.patch
+          git am --keep-cr ../../../patches/$name/*.patch
           cd ../..
-          echo $i
         done
         cd ..
         

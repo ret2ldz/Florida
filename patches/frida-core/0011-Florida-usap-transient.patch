@@ -1,0 +1,47 @@
+From 4a7b9c12f3d8e5a6b7c9d0e1f2a3b4c5d6e7f8a9 Mon Sep 17 00:00:00 2001
+From: dezige131 <dezige131@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: usap-transient
+
+Tolerate transient USAP patch misses on Android 16. Some `usap*`
+processes only have `libandroid_runtime.so` mapped without the boot
+image / `dalvik-LinearAlloc` mappings that contain
+`android.os.Process.setArgV0()`. Swallow the specific NOT_SUPPORTED
+failure for `usap*` processes so spawning proceeds when the main
+zygote and other USAPs patch successfully.
+
+See: https://github.com/frida/frida-core/pull/1246
+
+---
+ src/linux/linux-host-session.vala | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/linux/linux-host-session.vala b/src/linux/linux-host-session.vala
+index 44bd94003..8b6724d29 100644
+--- a/src/linux/linux-host-session.vala
++++ b/src/linux/linux-host-session.vala
+@@ -1598,10 +1598,21 @@ namespace Frida {
+
+ 				on_complete (null);
+ 			} catch (GLib.Error e) {
++				if (is_transient_usap_patch_failure (name, e)) {
++					on_complete (null);
++					return;
++				}
++
+ 				on_complete (e);
+ 			}
+ 		}
+
++		private static bool is_transient_usap_patch_failure (string process_name, GLib.Error error) {
++			return process_name.has_prefix ("usap") &&
++				error is Error.NOT_SUPPORTED &&
++				error.message == "Unable to locate android.os.Process.setArgV0() slot; please file a bug";
++		}
++
+ 		private async void inject_zymbiote (uint pid, Cancellable? cancellable) throws Error, IOError {
+ 			var prep = yield prepare_zymbiote_injection (pid, cancellable);
+
+--
+2.47.3
+
