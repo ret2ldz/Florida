@@ -1,0 +1,54 @@
+From 5b1c7d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c Mon Sep 17 00:00:00 2001
+From: ret2ldz <ret2ldz@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: selinux-labels
+
+Rename the SELinux contexts frida sets on injected files and memfds from
+`u:object_r:frida_file:s0` / `u:object_r:frida_memfd:s0` to a custom
+label. Apps that call getfilecon() / fgetfilecon() on /data/local/tmp
+artifacts scan for the `frida_file`/`frida_memfd` types.
+
+Merged from https://github.com/TheQmaks/phantom-frida (SELINUX_PATCHES).
+
+Note: the custom type is unlikely to exist in the device's SELinux
+policy, so setfilecon() will fail silently and the file keeps the
+directory's default context. That is the same effect as commenting the
+calls out — the agent still loads because root injects with
+DAC_OVERRIDE, and the missing label is exactly what hides us from
+context-based scans.
+
+---
+ src/linux/linjector.vala | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/linux/linjector.vala b/src/linux/linjector.vala
+index 5671438..e83bdd8 100644
+--- a/src/linux/linjector.vala
++++ b/src/linux/linjector.vala
+@@ -265,20 +265,20 @@ namespace Frida {
+ 	private static void adjust_directory_permissions (string path) {
+ 		FileUtils.chmod (path, 0755);
+ #if ANDROID
+-		SELinux.setfilecon (path, "u:object_r:frida_file:s0");
++		SELinux.setfilecon (path, "u:object_r:ggbond_file:s0");
+ #endif
+ 	}
+
+ 	private static void adjust_file_permissions (string path) {
+ 		FileUtils.chmod (path, path.has_suffix (".so") ? 0755 : 0644);
+ #if ANDROID
+-		SELinux.setfilecon (path, "u:object_r:frida_file:s0");
++		SELinux.setfilecon (path, "u:object_r:ggbond_file:s0");
+ #endif
+ 	}
+
+ 	private static void adjust_fd_permissions (FileDescriptor fd) {
+ #if ANDROID
+-		SELinux.fsetfilecon (fd.handle, "u:object_r:frida_memfd:s0");
++		SELinux.fsetfilecon (fd.handle, "u:object_r:ggbond_memfd:s0");
+ #endif
+ 	}
+ }
+--
+2.47.3
+

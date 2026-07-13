@@ -1,0 +1,49 @@
+From 6c2d8e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d Mon Sep 17 00:00:00 2001
+From: ret2ldz <ret2ldz@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: exit-monitor-disable
+
+Disable the Frida exit monitor that hooks exit/_exit/abort (and
+ExitProcess on Windows). The hook is detectable: target apps call exit()
+and observe whether the listener ran, or scan /proc/self/maps for the
+trampoline gum installs near the libc exit symbol. Comment out the
+interceptor.attach calls so no hook is installed.
+
+Cost: frida scripts that registered an "on exit" cleanup handler via
+Frida.on('spawn:aborted') / similar will not fire. Acceptable tradeoff
+for stealth.
+
+Merged from https://github.com/TheQmaks/phantom-frida (LIBC_HOOK_PATCHES).
+
+---
+ lib/payload/exit-monitor.vala | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/lib/payload/exit-monitor.vala b/lib/payload/exit-monitor.vala
+index b1f4fe7..3ea9b94 100644
+--- a/lib/payload/exit-monitor.vala
++++ b/lib/payload/exit-monitor.vala
+@@ -32,8 +32,9 @@ namespace Frida {
+ 			unowned Gum.InvocationListener listener = this;
+
+ #if WINDOWS
+-			interceptor.attach ((void *) Gum.Process.find_module_by_name ("kernel32.dll").find_export_by_name ("ExitProcess"),
+-				listener);
++			// Florida: exit-monitor disabled (interceptor.attach leaves a detectable trampoline).
++			// interceptor.attach ((void *) Gum.Process.find_module_by_name ("kernel32.dll").find_export_by_name ("ExitProcess"),
++			// 	listener);
+ #else
+ 			var libc = Gum.Process.get_libc_module ();
+ 			const string[] apis = {
+@@ -42,7 +43,7 @@ namespace Frida {
+ 				"abort",
+ 			};
+ 			foreach (var symbol in apis) {
+-				interceptor.attach ((void *) libc.find_export_by_name (symbol), listener);
++				// interceptor.attach ((void *) libc.find_export_by_name (symbol), listener);
+ 			}
+ #endif
+ 		}
+--
+2.47.3
+

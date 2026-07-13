@@ -1,0 +1,49 @@
+From 9f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a Mon Sep 17 00:00:00 2001
+From: ret2ldz <ret2ldz@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: exceptor-disable
+
+Disable Gum's gumexceptor backend that replaces libc `signal()` and
+`sigaction()` with frida's own implementations. The replacement is
+detectable: target apps install a signal handler, raise a signal, and
+check whether their handler ran (it won't, because frida's replacement
+swallows it). Or they scan the PLT/GOT for the trampoline frida installs.
+
+Commenting out the two `gum_interceptor_replace()` calls leaves
+`signal()` / `sigaction()` pointing at the real libc implementations,
+so app-installed handlers run normally.
+
+Cost: frida's own crash recovery (sigaction-based SEGV catch for
+stalker/interceptor) stops working. Acceptable tradeoff for stealth —
+frida scripts that rely on internal crash recovery will need to handle
+signals themselves.
+
+Merged from https://github.com/TheQmaks/phantom-frida (LIBC_HOOK_PATCHES).
+
+---
+ gum/backend-posix/gumexceptor-posix.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/gum/backend-posix/gumexceptor-posix.c b/gum/backend-posix/gumexceptor-posix.c
+index 8bc439a..a7adb8d 100644
+--- a/gum/backend-posix/gumexceptor-posix.c
++++ b/gum/backend-posix/gumexceptor-posix.c
+@@ -279,10 +279,11 @@ gum_exceptor_backend_attach (GumExceptorBackend * self)
+   {
+     gum_interceptor_begin_transaction (interceptor);
+
+-    gum_interceptor_replace (interceptor, gum_original_signal,
+-        gum_exceptor_backend_replacement_signal, NULL, &options);
+-    gum_interceptor_replace (interceptor, gum_original_sigaction,
+-        gum_exceptor_backend_replacement_sigaction, NULL, &options);
++    // Florida: exceptor disabled (interceptor.replace for signal/sigaction is detectable).
++    // gum_interceptor_replace (interceptor, gum_original_signal,
++    //     gum_exceptor_backend_replacement_signal, NULL, &options);
++    // gum_interceptor_replace (interceptor, gum_original_sigaction,
++    //     gum_exceptor_backend_replacement_sigaction, NULL, &options);
+
+     gum_interceptor_end_transaction (interceptor);
+   }
+--
+2.47.3
+

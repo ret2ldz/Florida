@@ -1,0 +1,34 @@
+From 7d3e9f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e Mon Sep 17 00:00:00 2001
+From: ret2ldz <ret2ldz@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: temp-prefix
+
+Rename the `"frida-"` prefix that frida prepends to random temp file
+names (used by `Frida.System.make_name()` for sockets, lockfiles, and
+scratch files written under /data/local/tmp). Files in /tmp with the
+`frida-` prefix are a fingerprint — the renamer in phantom-frida finds
+this single call site in src/system.vala (the other two occurrences are
+Windows-only: pipe-windows.c and frida-helper-service-glue.c).
+
+Merged from https://github.com/TheQmaks/phantom-frida (get_temp_path_patches).
+
+---
+ src/system.vala | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/system.vala b/src/system.vala
+index 1a2b3c4d..2b3c4d5e 100644
+--- a/src/system.vala
++++ b/src/system.vala
+@@ -238,7 +238,7 @@ namespace Frida {
+ 		}
+
+ 		public static string make_name () {
+-			var builder = new StringBuilder ("frida-");
++			var builder = new StringBuilder ("ggbond-");
+ 			for (var i = 0; i != 16; i++)
+ 				builder.append_printf ("%02x", Random.int_range (0, 256));
+ 			return builder.str;
+--
+2.47.3
+

@@ -1,0 +1,60 @@
+From 8e4f9a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f Mon Sep 17 00:00:00 2001
+From: ret2ldz <ret2ldz@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: pool-spawner and string sweep
+
+Extend anti-anti-frida.py with two more vectors:
+
+1. pool-spawner thread name. GLib's thread pool spawns a worker thread
+   named `pool-spawner` that shows up in /proc/self/task/*/comm. Existing
+   Florida patches already cover gmain, gdbus, gum-js-loop — pool-spawner
+   was missed. Random 12-char replacement (same length).
+
+2. Residual frida\0 / FRIDA\0 byte sweep in .rodata. The symbol-level
+   pass earlier in the script only catches `frida` inside ELF dynamic
+   symbol names. Standalone null-terminated "frida"/"FRIDA" strings in
+   .rodata (log strings, error messages, build identifiers) survive into
+   the shipped binary. Same-length replacement to `libgc\0` / `XBNDL\0`
+   so the binary layout is unchanged.
+
+   We deliberately do NOT sweep "Frida\0" (capital F, lowercase ridA):
+   the JS runtime exposes the `Frida` global object (Frida.version,
+   Frida.Runtime, etc.) embedded in the compiled binary. Replacing
+   "Frida\0" corrupts the JS engine and trips
+   `ReferenceError: Frida is not defined` (see TheQmaks/phantom-frida#1).
+
+Merged from https://github.com/TheQmaks/phantom-frida
+(get_binary_patches + get_binary_string_patches).
+
+---
+ src/anti-anti-frida.py | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/src/anti-anti-frida.py b/src/anti-anti-frida.py
+index da54e72..33fdfb8 100644
+--- a/src/anti-anti-frida.py
++++ b/src/anti-anti-frida.py
+@@ -57,4 +57,20 @@ if __name__ == "__main__":
+     log_color(f"[*] Patch `gdbus` to `{random_name}`")
+     os.system(f"sed -b -i s/gdbus/{random_name}/g {input_file}")
+
++
++    # thread_pool_spawner
++    random_name = "".join(random.sample(random_charset, 12))
++    log_color(f"[*] Patch `pool-spawner` to `{random_name}`")
++    os.system(f"sed -b -i s/pool-spawner/{random_name}/g {input_file}")
++
++    # residual frida\0 / FRIDA\0 string sweep in .rodata
++    sweep_pairs = [(b"frida\x00", b"libgc\x00"), (b"FRIDA\x00", b"XBNDL\x00")]
++    for section in binary.sections:
++        if section.name != ".rodata":
++            continue
++        for old, new in sweep_pairs:
++            for addr in section.search_all(old):
++                binary.patch_address(section.file_offset + addr, list(new))
++                log_color(f"[*] Swept {old!r} -> {new!r} at offset {hex(section.file_offset + addr)}")
++
+     log_color(f"[*] Patch Finish")
+--
+2.47.3
+

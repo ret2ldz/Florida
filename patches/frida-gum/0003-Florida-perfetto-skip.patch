@@ -1,0 +1,45 @@
+From a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9 Mon Sep 17 00:00:00 2001
+From: ret2ldz <ret2ldz@users.noreply.github.com>
+Date: Sun, 13 Jul 2026 00:00:00 +0800
+Subject: [PATCH] Florida: perfetto-skip
+
+Skip threads whose name starts with `perfetto_hprof_` during thread
+enumeration in `_gum_process_enumerate_threads()`. These threads are
+spawned by the Android runtime's perfetto heap profiler and are a known
+crash source — gum's thread enumeration segfaults on some devices when
+it tries to introspect perfetto threads that are in the middle of
+munmap-ing their own stack.
+
+phantom-frida shipped this as a "stability fix" but their version was
+broken: it used `goto skip;` without defining a `skip:` label (compile
+error) and a typo `perfetto_hprob_` instead of `perfetto_hprof_` (the
+check would never match anything). This version uses a clean
+short-circuit `&&` so no label is needed, and uses `strncmp` with the
+correct 15-char prefix length (`perfetto_hprof_` is 15 chars including
+the trailing underscore, but thread names usually carry a numeric suffix
+like `perfetto_hprof_12345` so prefix match is what we want).
+
+Merged (with bug fixes) from
+https://github.com/TheQmaks/phantom-frida (get_stability_patches_17).
+
+---
+ gum/backend-linux/gumprocess-linux.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gum/backend-linux/gumprocess-linux.c b/gum/backend-linux/gumprocess-linux.c
+index f922da5..6c1ac71 100644
+--- a/gum/backend-linux/gumprocess-linux.c
++++ b/gum/backend-linux/gumprocess-linux.c
+@@ -1139,7 +1139,8 @@ _gum_process_enumerate_threads (GumFoundThreadFunc func,
+
+     entry = &g_array_index (entries, GumThreadDetails, i);
+
+-    if (gum_fill_thread_details (entry, flags))
++    if (gum_fill_thread_details (entry, flags) &&
++        !(entry->name != NULL && strncmp (entry->name, "perfetto_hprof_", 15) == 0))
+       carry_on = func (entry, user_data);
+
+     g_free ((gpointer) entry->name);
+--
+2.47.3
+
