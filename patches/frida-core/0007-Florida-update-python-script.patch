@@ -23,7 +23,7 @@ diff --git a/src/anti-anti-frida.py b/src/anti-anti-frida.py
 index 83e8d3e..6dc1c66 100644
 --- a/src/anti-anti-frida.py
 +++ b/src/anti-anti-frida.py
-@@ -3,35 +3,58 @@ import sys
+@@ -3,35 +3,59 @@ import sys
  import random
  import os
  
@@ -66,7 +66,8 @@ index 83e8d3e..6dc1c66 100644
 +            addr_all = section.search_all(patch_str)
 +            for addr in addr_all:
 +                patch = [ord(n) for n in list(patch_str)[::-1]]
-+                log_color(f"[*] Patching section name={section.name} offset={hex(section.file_offset + addr)} orig:{patch_str} new:{\'\'.join(list(patch_str)[::-1])}")
++                reversed_patch_str = ''.join(list(patch_str)[::-1])
++                log_color(f"[*] Patching section name={section.name} offset={hex(section.file_offset + addr)} orig:{patch_str} new:{reversed_patch_str}")
 +                binary.patch_address(section.file_offset + addr, patch)
 +
      binary.write(input_file)
