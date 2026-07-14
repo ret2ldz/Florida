@@ -1,4 +1,4 @@
-修复/掩盖的 frida 特征（共 11 个向量）：                                                                                                  
+### 修复/掩盖的 frida 特征（共 12 个）：                                                                                                  
                                                                                                                                           
   1. "frida:rpc" 协议魔数字符串 → base64 解码随机名（0001）                                                                                 
   2. frida-agent-<arch>.so 库文件名 → 运行时 UUID 前缀（0002）                                                                              
@@ -19,3 +19,17 @@
                                                                                                                                           
   仍未覆盖：默认端口 27042、D-Bus 协议接口名 re.frida.HostSession17 等（改了会断 frida 客户端协议）、re.frida.Helper Java 包（预构建        
   helper.dex 不重建）、GType 名 FridaServer 等、TracerPid、agent dlopen 路径痕迹、QuickJS 常量。
+
+### 建议运行方式
+
+```
+# ./florida -l 127.0.0.1:56789 &
+
+> adb forward tcp:56789 tcp:56789
+> frida -H 127.0.0.1:56789 -f com.app -l trace.js
+```
+
+### 写在最后
+
+todo，
+
