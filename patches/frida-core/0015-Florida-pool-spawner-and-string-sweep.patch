@@ -55,6 +55,7 @@ index da54e72..33fdfb8 100644
 +                log_color(f"[*] Swept {old!r} -> {new!r} at offset {hex(section.file_offset + addr)}")
 +
      log_color(f"[*] Patch Finish")
+\ No newline at end of file
 --
 2.47.3
 

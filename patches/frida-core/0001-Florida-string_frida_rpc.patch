@@ -3,18 +3,27 @@ From: Ylarod <me@ylarod.cn>
 Date: Tue, 18 Jul 2023 15:51:29 +0800
 Subject: [PATCH 1/9] Florida: string_frida_rpc
 
+Replaces the literal "frida:rpc" RPC magic with a base64-decoded
+random name, both in outgoing requests and in the inbound match check.
+
+Re-generated against current frida main — `lib/base/rpc.vala` was
+refactored so that the old `RpcPeer` class became `RpcClient` and a new
+`RpcPeer` interface was added at the bottom of the file. The constructor
+moved from line 11 to line 22, and the `"frida:rpc"` references shifted
+from lines 27/73/102 to 39/99/128. The patch logic is unchanged.
+
 ---
  lib/base/rpc.vala | 15 ++++++++++++---
  1 file changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/lib/base/rpc.vala b/lib/base/rpc.vala
-index 8990b70e..d5acfebd 100644
+index 97edecf..8896f70 100644
 --- a/lib/base/rpc.vala
 +++ b/lib/base/rpc.vala
-@@ -11,13 +11,22 @@ namespace Frida {
+@@ -22,6 +22,15 @@ namespace Frida {
  			Object (peer: peer);
  		}
- 
+
 +		public string getRpcStr(bool quote){
 +			string result = (string) GLib.Base64.decode((string) GLib.Base64.decode("Wm5KcFpHRTZjbkJq"));
 +			if(quote){
@@ -24,9 +33,10 @@ index 8990b70e..d5acfebd 100644
 +			}
 +		}
 +
- 		public async Json.Node call (string method, Json.Node[] args, Bytes? data, Cancellable? cancellable) throws Error, IOError {
- 			string request_id = Uuid.string_random ();
- 
+ 		/**
+ 		 * Calls a remote method and waits for its result.
+ 		 *
+@@ -36,7 +45,7 @@ namespace Frida {
  			var request = new Json.Builder ();
  			request
  				.begin_array ()
@@ -35,24 +45,24 @@ index 8990b70e..d5acfebd 100644
  				.add_string_value (request_id)
  				.add_string_value ("call")
  				.add_string_value (method)
-@@ -70,7 +79,7 @@ namespace Frida {
- 		}
- 
+@@ -96,7 +105,7 @@ namespace Frida {
+ 		 * @return true if the message was an RPC message and was handled
+ 		 */
  		public bool try_handle_message (string json) {
 -			if (json.index_of ("\"frida:rpc\"") == -1)
 +			if (json.index_of (getRpcStr(true)) == -1)
  				return false;
- 
+
  			var parser = new Json.Parser ();
-@@ -99,7 +108,7 @@ namespace Frida {
+@@ -125,7 +134,7 @@ namespace Frida {
  				return false;
- 
+
  			string? type = rpc_message.get_element (0).get_string ();
 -			if (type == null || type != "frida:rpc")
 +			if (type == null || type != getRpcStr(false))
  				return false;
- 
+
  			var request_id_value = rpc_message.get_element (1);
--- 
-2.47.1
+--
+2.47.3
 
