@@ -160,6 +160,10 @@ jobs:
           git am --keep-cr ../../../patches/$name/*.patch
           cd ../..
         done
+        # Binary-patch pre-built zymbiote.elf to remove 'frida' from the
+        # abstract-socket name visible in /proc/net/unix. See patch
+        # 0017-Florida-zymbiote-socket-name.patch for context.
+        python3 subprojects/frida-core/src/linux/helpers/patch-zymbiote-elf.py
         cd ..
         
         ARCHES="android-arm android-arm64 android-x86 android-x86_64"

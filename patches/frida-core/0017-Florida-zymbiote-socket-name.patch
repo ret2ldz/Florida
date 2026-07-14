@@ -1,0 +1,111 @@
+From 1fc7b7b1786bb43dad8975979149494ae8617bba Mon Sep 17 00:00:00 2001
+From: t <t@t.com>
+Date: Tue, 14 Jul 2026 13:57:26 +0800
+Subject: [PATCH] Florida: zymbiote-socket-name
+
+---
+ src/linux/helpers/patch-zymbiote-elf.py | 55 +++++++++++++++++++++++++
+ src/linux/helpers/zymbiote.c            |  2 +-
+ src/linux/linux-host-session.vala       |  4 +-
+ 3 files changed, 58 insertions(+), 3 deletions(-)
+ create mode 100755 src/linux/helpers/patch-zymbiote-elf.py
+
+diff --git a/src/linux/helpers/patch-zymbiote-elf.py b/src/linux/helpers/patch-zymbiote-elf.py
+new file mode 100755
+index 0000000..d859fdf
+--- /dev/null
++++ b/src/linux/helpers/patch-zymbiote-elf.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""
++Binary-patch the pre-built zymbiote.elf files to replace the
++`/frida-zymbiote-` placeholder prefix with `/ggbnd-zymbiote-` so the
++abstract socket name visible in /proc/net/unix doesn't contain 'frida'.
++
++Same-length 16-byte replace — ELF layout is unchanged. Run after the
++git-am patch loop, before meson configure.
++
++Without this, /proc/net/unix shows:
++  @/frida-zymbiote-<32hex>
++"""
++import sys
++from pathlib import Path
++
++OLD = b"/frida-zymbiote-"
++NEW = b"/ggbnd-zymbiote-"
++
++
++def patch_elf(path: Path) -> int:
++    data = path.read_bytes()
++    count = data.count(OLD)
++    if count == 0:
++        print(f"[!] {path.name}: placeholder not found, skipping")
++        return 0
++    data = data.replace(OLD, NEW)
++    path.write_bytes(data)
++    print(f"[*] {path.name}: replaced {count} occurrence(s)")
++    return count
++
++
++def main() -> int:
++    helpers_dir = Path(__file__).parent / "artifacts" / "native"
++    if not helpers_dir.is_dir():
++        print(f"[!] helpers dir not found: {helpers_dir}", file=sys.stderr)
++        return 1
++
++    total = 0
++    for arch in ("arm", "arm64", "x86", "x86_64"):
++        elf = helpers_dir / arch / "zymbiote.elf"
++        if not elf.is_file():
++            print(f"[!] missing: {elf}", file=sys.stderr)
++            continue
++        total += patch_elf(elf)
++
++    print(f"[*] Total replacements: {total}")
++    if total == 0:
++        print("[!] No patches applied — did the placeholder change upstream?",
++              file=sys.stderr)
++        return 1
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/src/linux/helpers/zymbiote.c b/src/linux/helpers/zymbiote.c
+index b9fa526..91e2da7 100644
+--- a/src/linux/helpers/zymbiote.c
++++ b/src/linux/helpers/zymbiote.c
+@@ -37,7 +37,7 @@ struct _ZymbioteContext
+ 
+ ZymbioteContext zymbiote =
+ {
+-  .socket_path = "/frida-zymbiote-00000000000000000000000000000000",
++  .socket_path = "/ggbnd-zymbiote-00000000000000000000000000000000",
+ };
+ 
+ int frida_zymbiote_replacement_setargv0 (JNIEnv * env, jobject clazz, jstring name);
+diff --git a/src/linux/linux-host-session.vala b/src/linux/linux-host-session.vala
+index 8b6724d..cf2d3f0 100644
+--- a/src/linux/linux-host-session.vala
++++ b/src/linux/linux-host-session.vala
+@@ -1528,7 +1528,7 @@ namespace Frida {
+ 			ensure_request = new Promise<bool> ();
+ 
+ 			if (server_name == null) {
+-				string name = "/frida-zymbiote-" + Uuid.string_random ().replace ("-", "");
++				string name = "/ggbnd-zymbiote-" + Uuid.string_random ().replace ("-", "");
+ 				var address = new UnixSocketAddress.with_type (name, -1, UnixSocketAddressType.ABSTRACT);
+ 
+ 				try {
+@@ -1965,7 +1965,7 @@ namespace Frida {
+ 
+ 			unowned uint8[] payload_template = blob.data[text.file_offset:text.file_offset + text.file_size];
+ 
+-			void * p = memmem (payload_template, "/frida-zymbiote-00000000000000000000000000000000".data);
++			void * p = memmem (payload_template, "/ggbnd-zymbiote-00000000000000000000000000000000".data);
+ 			assert (p != null);
+ 			size_t data_offset = (uint8 *) p - (uint8 *) payload_template;
+ 
+-- 
+2.50.1 (Apple Git-155)
+
